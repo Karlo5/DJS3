@@ -1,0 +1,3 @@
+Esta carpeta contiene los nucleos para convolucionar los planos de dosis de Oncentra
+y adapatarlos al tamaño finito de las cámaras del 2D-Array
+El filtro activo debe llamarse Default.conf

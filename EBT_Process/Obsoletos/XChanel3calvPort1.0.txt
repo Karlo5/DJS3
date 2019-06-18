@@ -1,0 +1,292 @@
+
+  requires("1.34m");
+
+//=======INICIALIZACION DE VARIABLES==CHECKSUM=====================================
+//inicializacion de variables
+  title = "Calibración de dosis MULTICANAL - 8-FOLD WAY";
+  data="ddmmaa"; 
+  lot="Y";
+  temps = "90m";
+  rutacal = "C:\\Documents and Settings\\Administrador\\Escritorio\\IMRT\\EBT2_Cal\\Mch\\";
+  rutapac = "Z:\\Calibraciones\\Cal"		
+
+//valores del fondo por sectores para evaluar su constancia
+//1 plástico, 2 placa, 3 fondo desnudo del escaner
+
+  vmitjana1 = 65502;
+  vmitjana2 = 46000;
+  vmitjana3 = 61555.2;
+  vdesv1 = 100;
+  vdesv2 = 3000;
+  vdesv3 = 380;
+
+//==================== cuadrado de media de la medida ======================
+
+  costat = 50;
+  centrex = -15
+  centrey = -15
+
+//parametros de ajuste de la regresión
+
+Cresol = 0.01;
+ 
+//========================FIN DE INICIALIZACION VARIABLES, FIN CHECKSUM===========
+
+//=============INTERFACE===USER data INPUT====================================
+//inicio de la interface de recogida de datos NH, Calibracion, cortes y placas
+  Dialog.create(title);
+  Dialog.addMessage("CALIBRACION DE EBT2 MULTICANAL");
+  Dialog.addString("Fecha:", data);  
+  Dialog.addString("Lote:", lot);
+  Dialog.addCheckbox("Interrumpir ante errores de fondo", true);
+  Dialog.addCheckbox("clasificacion alfabetica", true);
+    
+  Dialog.show();
+  data = Dialog.getString();
+  lot = Dialog.getString();
+  stoper = Dialog.getCheckbox();
+  alfabet = Dialog.getCheckbox();
+
+
+//FLUJO DEL PROGRAMA PRINCIPAL
+
+//Se crea el directorio de resultados intermedios (borrable)
+
+	File.makeDirectory(rutapac+data+lot+temps+"\\Rest");
+
+//Opcion de definicion de los archivos, numerico alfabet = false, A, B, C, D alfabet = true;
+
+if (alfabet==true) {
+	vA = "A";
+	vB = "B";
+	vC = "C";
+	vD = "D";
+} else {
+	vA = "001";
+	vB = "002";
+	vC = "003";
+	vD = "004";
+}
+
+//<<<<
+//===========abrir fondos y placas irradiadas, realizar la media de cuatro placas
+//===========extraer los tres canales canales de las medias
+//===========correccion por uniformidad en funcion del espacio y la dosis
+//===========substraccion del fondo a las placas irradiadas
+//<<<<
+
+///========PROCESADO INICIAL: MEDIA, SEPARACION POR COLORES, SUBSTRACCION DEL FONDO=========
+///========CORRECCION POR UNIFORMIDAD SEGUN LA FORMULA DE DURRHEIM
+ 
+//anemi, variable de stop segun stoper
+
+  
+//media de las placas irradiadas
+
+	open(rutapac+data+lot+temps+"\\C"+lot+vA+".tif");
+	open(rutapac+data+lot+temps+"\\C"+lot+vB+".tif");
+	open(rutapac+data+lot+temps+"\\C"+lot+vC+".tif");
+	open(rutapac+data+lot+temps+"\\C"+lot+vD+".tif");
+	imageCalculator("Average create stack", "C"+lot+vA+".tif","C"+lot+vB+".tif");
+	imageCalculator("Average create stack", "C"+lot+vC+".tif","C"+lot+vD+".tif");
+	imageCalculator("Average create stack", "Result of C"+lot+vA+".tif","Result of C"+lot+vC+".tif");
+
+	selectWindow("Result of C"+lot+vC+".tif");
+	close();
+	selectWindow("Result of C"+lot+vA+".tif");
+	close();
+	selectWindow("C"+lot+vD+".tif");
+	close();
+	selectWindow("C"+lot+vC+".tif");
+	close();
+	selectWindow("C"+lot+vB+".tif");
+	close();
+	selectWindow("C"+lot+vA+".tif");
+	close();
+	selectWindow("Result of Result of C"+lot+vA+".tif");
+
+	//====================Mejora de la version 5 corrección por la no uniformidad del escaner
+
+//multi-canal r g b placas irradiadas
+
+	run("Split Channels");
+	selectWindow("C1-Result of Result of C"+lot+vA+".tif");
+	saveAs("Tiff", rutapac+data+lot+temps+"\\Rest\\c"+lot+"r.tif");
+	selectWindow("C2-Result of Result of C"+lot+vA+".tif");
+	saveAs("Tiff", rutapac+data+lot+temps+"\\Rest\\c"+lot+"g.tif");
+	selectWindow("C3-Result of Result of C"+lot+vA+".tif");
+	saveAs("Tiff", rutapac+data+lot+temps+"\\Rest\\c"+lot+"b.tif");
+
+//media de los fondos
+
+	open(rutapac+data+lot+temps+"\\F"+lot+vA+".tif");
+	open(rutapac+data+lot+temps+"\\F"+lot+vB+".tif");
+	open(rutapac+data+lot+temps+"\\F"+lot+vC+".tif");
+	open(rutapac+data+lot+temps+"\\F"+lot+vD+".tif");
+	imageCalculator("Average create stack", "F"+lot+vA+".tif","F"+lot+vB+".tif");
+	imageCalculator("Average create stack", "F"+lot+vC+".tif","F"+lot+vD+".tif");
+	imageCalculator("Average create stack", "Result of F"+lot+vA+".tif","Result of F"+lot+vC+".tif");
+
+	selectWindow("Result of F"+lot+vC+".tif");
+	close();
+	selectWindow("Result of F"+lot+vA+".tif");
+	close();
+	selectWindow("F"+lot+vD+".tif");
+	close();
+	selectWindow("F"+lot+vC+".tif");
+	close();
+	selectWindow("F"+lot+vB+".tif");
+	close();
+	selectWindow("F"+lot+vA+".tif");
+	close();
+	selectWindow("Result of Result of F"+lot+vA+".tif");
+
+	
+	
+
+//multi-canal r g b del fondo
+
+	run("Split Channels");
+	
+	selectWindow("C1-Result of Result of F"+lot+vA+".tif");
+	saveAs("Tiff", rutapac+data+lot+temps+"\\Rest\\f"+lot+"r.tif");
+	selectWindow("C2-Result of Result of F"+lot+vA+".tif");
+	saveAs("Tiff", rutapac+data+lot+temps+"\\Rest\\f"+lot+"g.tif");
+	selectWindow("C3-Result of Result of F"+lot+vA+".tif");
+	saveAs("Tiff", rutapac+data+lot+temps+"\\Rest\\f"+lot+"b.tif");
+	selectWindow("f"+lot+"r.tif");
+
+// <<<Verificacion constancia escaneo canal rojo
+	//PARENTESIS DE VERIFICACION DE CONSTANCIA
+		makeRectangle(54, 744, 100, 100);
+		getStatistics(n, mean, min, max, std, histogram);
+		if ((mean < vmitjana1+vdesv1) && (mean > vmitjana1-vdesv1)) { 
+			print("sector 1 escaner constante OK");}
+		else { if(stoper == true){
+			Dialog.create("Error sector1");
+			Dialog.addMessage("Error en el fondo de cristal");
+			Dialog.show();}}
+		makeRectangle(529, 418, 161, 156);
+		getStatistics(n, mean, min, max, std, histogram);
+		if ((mean < vmitjana2+vdesv2) && (mean > vmitjana2-vdesv2)) { 
+			print("sector 2 escaner constante OK");}
+		else { if(stoper == true){ 
+			Dialog.create("Error sector2");
+			Dialog.addMessage("Error en el fondo de placa");
+			Dialog.show();}}
+		makeRectangle(972, 442, 100, 100);
+		getStatistics(n, mean, min, max, std, histogram);
+		if ((mean < vmitjana3+vdesv3) && (mean > vmitjana3-vdesv3)) { 
+			print("sector 3 escaner constante OK");}
+		else { if(stoper == true){
+			Dialog.create("Error sector3");
+			Dialog.addMessage("Error en el fondo de plastico");
+			Dialog.show();}}
+	run("Select None");
+	//FIN DE PARENTESIS
+
+//====resta del fondo a la placa irradiada por canales
+//rojo
+	
+	imageCalculator("Substract create", "f"+lot+"r.tif","c"+lot+"r.tif");
+	selectWindow("c"+lot+"r.tif");
+	close();
+	selectWindow("f"+lot+"r.tif");
+	close();
+	selectWindow("Result of f"+lot+"r.tif");	
+	saveAs("Tiff", rutapac+data+lot+temps+"\\Rest\\c"+lot+"fr.tif");
+	
+//verde
+	
+	imageCalculator("Substract create", "f"+lot+"g.tif","c"+lot+"g.tif");
+	selectWindow("c"+lot+"g.tif");
+	close();
+	selectWindow("f"+lot+"g.tif");
+	close();
+	selectWindow("Result of f"+lot+"g.tif");	
+	saveAs("Tiff", rutapac+data+lot+temps+"\\Rest\\c"+lot+"fg.tif");
+	
+//azul
+	
+	imageCalculator("Substract create", "f"+lot+"b.tif","c"+lot+"b.tif");
+	selectWindow("c"+lot+"b.tif");
+	close();
+	selectWindow("f"+lot+"b.tif");
+	close();
+	selectWindow("Result of f"+lot+"b.tif");	
+	saveAs("Tiff", rutapac+data+lot+temps+"\\Rest\\c"+lot+"fb.tif");
+	
+		
+//========FIN PROCESADO INICIAL PLACAS
+
+/////============================OBTENCION DE VALORES POR SECTORES Y COLORES==============
+
+quark = newArray("r","g","b");
+wg = newArray(1, 1, 0.5);
+ng = newArray(8);
+ang = newArray(8);
+dosis = newArray( 0.1498, 0.2996, 0.5993, 0.8989, 1.1986, 1.648, 2.0975, 2.5469);
+
+sortida = File.open(rutacal+"cal3ch"+lot+".txt");
+stream = newArray(8);
+
+for (k=0; k<3; k++){
+
+	selectWindow("c"+lot+"f"+quark[k]+".tif");
+
+	makeRectangle(224-centrex, 544-centrey,costat, costat);
+	getStatistics(area, ng[0], min, max, std);
+	makeRectangle(393-centrex, 544-centrey, costat, costat);
+	getStatistics(area, ng[1], min, max, std);
+	makeRectangle(565-centrex, 544-centrey, costat, costat);
+	getStatistics(area, ng[2], min, max, std);
+	makeRectangle(734-centrex, 544-centrey, costat, costat);
+	getStatistics(area, ng[3], min, max, std);
+	makeRectangle(734-centrex, 261-centrey, costat, costat);
+	getStatistics(area, ng[4], min, max, std);
+	makeRectangle(565-centrex, 261-centrey, costat, costat);
+	getStatistics(area, ng[5], min, max, std);
+	makeRectangle(393-centrex, 261-centrey, costat, costat);
+	getStatistics(area, ng[6], min, max, std);
+	makeRectangle(224-centrex, 261-centrey, costat, costat);
+	getStatistics(area, ng[7], min, max, std);
+
+	mem = 0.0;	
+	for(j = 0; j < 7; j = j + Cresol){
+
+		for(i=0; i<8; i++){
+			ang[i] = ng[i]*(j+dosis[i])/10000;
+		}
+	
+		Fit.doFit("Straight Line", ang, dosis);
+		rsq = Fit.rSquared;
+		if(rsq >= mem){
+			Cpar = j;
+			mem2 = rsq;
+		}
+		mem = rsq;
+	}
+	//print(Cpar);
+	//print(d2s(mem2,6));
+
+	for(i=0; i<8; i++){
+		ang[i] = ng[i]*(Cpar+dosis[i])/10000;
+	}	
+	Fit.doFit("Straight Line", ang, dosis);
+	Npar= Fit.p(0);
+	Mpar = Fit.p(1);
+	mem3 = Fit.rSquared;
+	Bpar = 1/Mpar*10000;
+	Apar = -Npar/Mpar*10000;
+	sA = d2s(Apar, 3);
+	sB = d2s(Bpar, 3);
+	sC = d2s(Cpar, 2);
+	print(sortida, sA+"	"+sB+"	"+sC+"	"+wg[k]);
+	print(" R^2 para C = ", mem2, " para A y B = ", mem3);
+	
+}
+
+
+print("\n FIN DEL PROCESADO TOTAL");
+
+

@@ -1,0 +1,872 @@
+
+  requires("1.34m");
+
+//inicializacion de variables
+
+  title = "Cabezera";
+  nh="999999"; 
+  lote="W";
+  
+//variables de escala para 72 dpi
+
+  amplada = "333";
+  alsada = "227";
+
+//valores de recorte de la imagen, centrado en la placa
+
+  margex = 480;
+  margey = 320;
+  origenx = 68;
+  origeny = 170;
+  chksum = amplada + alsada + margex + margey+ origenx+ origeny;
+ 
+//inicializacion variables calibracion
+
+  grisos = "2928.0 \n4740.0 \n7571.0 \n10195.0 \n12644.0 \n15504.0 \n18249.0 \n20607.0 ";
+
+  dosis = "0.4494 \n0.8988 \n1.7979 \n2.6967 \n3.5958 \n4.944 \n6.2925 \n7.6407 ";
+
+//archivo de corrección por no uniformidad del escaner
+
+  arxiunif = "Norma16.tif";
+
+//valores para buscar los puntos para rotar la placa
+  
+  p1idef1 = 770;
+  p1jdef1 = 180;
+  p2idef1 = 830;
+  p2jdef1 = 370;
+  p3idef1 = 780;
+  p3jdef1 = 700;
+  costatdef1 = 60;
+
+  chksum = p1idef1 + p1jdef1 + p2idef1 + p2jdef1 + p3idef1 + p3jdef1 + costatdef1 + chksum;
+
+//valores para buscar los puntos para posicionar el origen
+
+  p1idef2 = 340;
+  p1jdef2 = 200;
+  p2idef2 = 535;
+  p2jdef2 = 170;
+  p3idef2 = 860;
+  p3jdef2 = 200;
+  costatdef2 =130;
+
+  chksum = p1idef2 + p1jdef2 + p2idef2 + p2jdef2 + p3idef2 + p3jdef2 + costatdef2 + chksum;
+
+//valor de inicio de busqueda de puntos
+
+  mindef = 65000;
+
+//valores del fondo por sectores para evaluar su constancia
+//1 plástico, 2 placa, 3 fondo desnudo del escaner
+
+  vmitjana1 = 65502;
+  vmitjana2 = 50218;
+  vmitjana3 = 61555.2;
+  vdesv1 = 100;
+  vdesv2 = 1509;
+  vdesv3 = 380;
+
+//Verificacion CHeckSum de constantes
+ 
+ chksum = chksum + vmitjana1 + vmitjana2 + 2000 + vmitjana3 + vdesv1 + vdesv2 -1000+ vdesv3;
+  print (chksum);
+  if (chksum == 3.3324574272E9) {print ("chksum OK");}
+  else{ print("chksum error");Dialog.create("Error CHKSUM");
+Dialog.addMessage("Error CHKSUM: "+ chksum);
+Dialog.show();}
+
+//inicio de la interface de recogida de datos NH, Calibracion, cortes y placas
+
+  Dialog.create("Procesado de EBT2");
+  Dialog.addMessage("Macro para el procesado de placas EBT2");
+  Dialog.addString("NH:", "999999");  
+  Dialog.addString("Lote:", lote);
+  Dialog.addCheckbox("Interrumpir ante errores de fondo", true);
+  Dialog.addCheckbox("placa1", true);
+  Dialog.addString("placa:", "1" );
+  Dialog.addString("Y :","4");
+  Dialog.addCheckbox("placa2", true);
+  Dialog.addString("placa:", "2" );
+  Dialog.addString("Y :","0");
+  Dialog.addCheckbox("placa3", true);
+  Dialog.addString("placa:", "3" );
+  Dialog.addString("Y :","m4");
+  
+  Dialog.show();
+  nh = Dialog.getString();
+  lote = Dialog.getString();
+  stoper = Dialog.getCheckbox();
+
+//archivo de calibración real
+
+  dadescalibracio = File.openAsString("C:\\Documents and Settings\\Administrador\\Escritorio\\IMRT\\EBT2_Cal\\cal90m"+lote+"dir.txt");
+  grisos = dadescalibracio+" ";
+
+'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>placa uno'
+
+//FLUJO DEL PROGRAMA
+//
+//abrir fondos y placas irradiadas, realizar la media de cuatro placas
+//extraer los canales rojos de las medias
+//substraccion del fondo a las placas irradiadas
+//
+//
+//corrección por no uniformidad del escaner
+//   (a través del archivo Norma16 que consiste en la media de una gran cantidad de fondos normalizados en el centro)
+//rotacion de la imagen
+//situacion del origen de la placa y recorte de la imagen alrededor de la misma
+//  (el programa situa el origen de la imagen en el centro de la misma, por lo que el origen se situa recortando un margen simetrico
+//  a partir del mismo)
+//reescalado de la placa
+//calibración de la placa
+//   (no se pueden especificar unidades de salida pero la calibración se hace para que salga en Gy, luego mediante verisoft se deben
+//   definir las unidades aunque el factor de renormalizacion debería ser 1.0 si no existiera el factor X)
+//limpieza, reordenación de archivos intermedios
+//El resto -borrable- se añade en la carpeta Rest, la media de las placas originales
+//A conservar se añade a la carpeta Raw
+ 
+//anemi, variable de stop segun stoper
+
+ anemi = Dialog.getCheckbox();
+  if (anemi==true){
+  
+  placa = Dialog.getString();
+  yaxis = Dialog.getString();
+  
+//media de las placas irradiadas
+
+open("Z:\\"+nh+"_FILM\\y"+yaxis+"A.tif");
+open("Z:\\"+nh+"_FILM\\y"+yaxis+"B.tif");
+open("Z:\\"+nh+"_FILM\\y"+yaxis+"C.tif");
+open("Z:\\"+nh+"_FILM\\y"+yaxis+"D.tif");
+imageCalculator("Average create stack", "y"+yaxis+"A.tif","y"+yaxis+"B.tif");
+imageCalculator("Average create stack", "y"+yaxis+"C.tif","y"+yaxis+"D.tif");
+imageCalculator("Average create stack", "Result of y"+yaxis+"A.tif","Result of y"+yaxis+"C.tif");
+selectWindow("Result of y"+yaxis+"C.tif");
+close();
+selectWindow("Result of y"+yaxis+"A.tif");
+close();
+selectWindow("y"+yaxis+"D.tif");
+close();
+selectWindow("y"+yaxis+"C.tif");
+close();
+selectWindow("y"+yaxis+"B.tif");
+close();
+selectWindow("y"+yaxis+"A.tif");
+close();
+selectWindow("Result of Result of y"+yaxis+"A.tif");
+
+//canal rojo placas irradiadas
+
+run("Split Channels");
+selectWindow("C2-Result of Result of y"+yaxis+"A.tif");
+close();
+selectWindow("C3-Result of Result of y"+yaxis+"A.tif");
+close();
+saveAs("Tiff", "Z:\\"+nh+"_FILM\\y"+yaxis+"r.tif");
+
+//media de los fondos
+
+open("Z:\\"+nh+"_FILM\\F"+placa+"A.tif");
+open("Z:\\"+nh+"_FILM\\F"+placa+"B.tif");
+open("Z:\\"+nh+"_FILM\\F"+placa+"C.tif");
+open("Z:\\"+nh+"_FILM\\F"+placa+"D.tif");
+imageCalculator("Average create stack", "F"+placa+"A.tif","F"+placa+"B.tif");
+imageCalculator("Average create stack", "F"+placa+"C.tif","F"+placa+"D.tif");
+imageCalculator("Average create stack", "Result of F"+placa+"A.tif","Result of F"+placa+"C.tif");
+
+selectWindow("Result of F"+placa+"C.tif");
+close();
+selectWindow("Result of F"+placa+"A.tif");
+close();
+selectWindow("F"+placa+"D.tif");
+close();
+selectWindow("F"+placa+"C.tif");
+close();
+selectWindow("F"+placa+"B.tif");
+close();
+selectWindow("F"+placa+"A.tif");
+close();
+selectWindow("Result of Result of F"+placa+"A.tif");
+
+//canal rojo del fondo
+
+run("Split Channels");
+selectWindow("C2-Result of Result of F"+placa+"A.tif");
+close();
+selectWindow("C3-Result of Result of F"+placa+"A.tif");
+close();
+
+
+//Verificacion constancia escaneo
+
+makeRectangle(49, 366, 155, 152);
+getStatistics(n, mean, min, max, std, histogram);
+if ((mean < vmitjana1+vdesv1) && (mean > vmitjana1-vdesv1)) 
+  { print("sector 1 escaner constante OK");}
+else { if(stoper == true){
+ Dialog.create("Error sector1");
+Dialog.addMessage("Error en el fondo de cristal");
+Dialog.show();}}
+makeRectangle(529, 418, 161, 156);
+getStatistics(n, mean, min, max, std, histogram);
+if ((mean < vmitjana2+vdesv2) && (mean > vmitjana2-vdesv2)) 
+  { print("sector 2 escaner constante OK");}
+else { if(stoper == true){ 
+ Dialog.create("Error sector2");
+Dialog.addMessage("Error en el fondo de placa");
+Dialog.show();}}
+makeRectangle(972, 442, 138, 127);
+getStatistics(n, mean, min, max, std, histogram);
+if ((mean < vmitjana3+vdesv3) && (mean > vmitjana3-vdesv3)) 
+  { print("sector 3 escaner constante OK");}
+else { if(stoper == true){
+ Dialog.create("Error sector3");
+Dialog.addMessage("Error en el fondo de plastico");
+Dialog.show();}}
+
+//resta del fondo a la placa irradiada
+
+saveAs("Tiff", "Z:\\"+nh+"_FILM\\f"+placa+"r.tif");
+imageCalculator("Subtract create", "f"+placa+"r.tif","y"+yaxis+"r.tif");
+selectWindow("Result of f"+placa+"r.tif");
+selectWindow("y"+yaxis+"r.tif");
+close();
+selectWindow("f"+placa+"r.tif");
+close();
+saveAs("Tiff", "Z:\\"+nh+"_FILM\\y"+yaxis+"fr.tif");
+
+//modificacion de la opcion de imageJ para no reescalar los valores de la placa al convertir de 32 a 16 bits
+
+run("Conversions...", " ");
+
+//corrección por la no uniformidad del escaner
+
+open("Z:\\Calibraciones\\Correccion Uniformidad\\Norma16.tif");
+imageCalculator("Divide create 32-bit", "y"+yaxis+"fr.tif","Norma16.tif");
+selectWindow("Result of y"+yaxis+"fr.tif");
+run("16-bit");
+saveAs("Tiff", "Z:\\"+nh+"_FILM\\y"+yaxis+"fru.tif");
+selectWindow("y"+yaxis+"fr.tif");
+close();
+selectWindow(arxiunif);
+close();
+selectWindow("y"+yaxis+"fru.tif");
+
+//rotacion de la placa
+
+p1i = p1idef1;
+p1j = p1jdef1;
+p2i = p2idef1;
+p2j = p2jdef1;
+p3i = p3idef1;
+p3j = p3jdef1;
+costat = costatdef1;
+
+min = mindef;
+for (i=p1i; i<p1i+costat; i++) {
+   for (j=p1j; j<p1j+costat; j++) {
+	mint = getPixel(i,j);
+	if (mint < min) {
+	min = mint;
+	p1x = i;
+	p1y = j;
+	} 
+   }
+}
+
+min = mindef;
+for (i=p2i; i<p2i+costat; i++) {
+   for (j=p2j; j<p2j+costat; j++) {
+	mint = getPixel(i,j);
+	if (mint < min) {
+	min = mint;
+	p2x = i;
+	p2y = j;
+	} 
+   }
+}
+
+min = mindef;
+for (i=p3i; i<p3i+costat; i++) {
+   for (j=p3j; j<p3j+costat; j++) {
+	mint = getPixel(i,j);
+	if (mint < min) {
+	min = mint;
+	p3x = i;
+	p3y = j;
+	} 
+   }
+}
+
+
+tanval = (p3x-p1x)/(p3y-p1y);
+alfa = atan(tanval)*360/2/3.1415926535-90.0;
+print("rotando placa...");
+print(alfa, " grados");
+
+run("Rotate... ", "angle=alfa grid=1 interpolation=Bilinear");
+
+//busqueda del origen de la placa rotada
+
+p1i = p1idef2;
+p1j = p1jdef2;
+p2i = p2idef2;
+p2j = p2jdef2;
+p3i = p3idef2;
+p3j = p3jdef2;
+costat = costatdef2;
+
+min = mindef;
+for (i=p1i; i<p1i+costat; i++) {
+   for (j=p1j; j<p1j+costat; j++) {
+	mint = getPixel(i,j);
+	if (mint < min) {
+	min = mint;
+	p1x = i;
+	p1y = j;
+	} 
+   }
+}
+
+min = mindef;
+for (i=p2i; i<p2i+costat; i++) {
+   for (j=p2j; j<p2j+costat; j++) {
+	mint = getPixel(i,j);
+	if (mint < min) {
+	min = mint;
+	p2x = i;
+	p2y = j;
+	} 
+   }
+}
+
+min = mindef;
+for (i=p3i; i<p3i+costat; i++) {
+   for (j=p3j; j<p3j+costat; j++) {
+	mint = getPixel(i,j);
+	if (mint < min) {
+	min = mint;
+	p3x = i;
+	p3y = j;
+	} 
+   }
+}
+
+
+
+p0x = origenx + p2x;
+p0y = origeny+p1y;
+
+print("origen de la placa ", p0x,p0y);
+makePoint(p2x,p2y);
+
+//recorte de la imagen, centrada en la placa
+
+makeRectangle(p0x-margex, p0y-margey, 2*margex, 2*margey);
+run("Copy");
+run("Internal Clipboard");
+saveAs("Tiff", "temp.tif");
+
+//reescalado de la placa
+
+configuracio = "x=- y=- width="+amplada+" height="+alsada+" interpolation=Bicubic create title=temp.tif";
+run("Scale...", configuracio);
+run("Remove Outliers...", "radius=2 threshold=50 which=Bright");
+saveAs("Tiff", "Z:\\"+nh+"_FILM\\y"+yaxis+"frug.tif");
+selectWindow("temp.tif");
+close();
+selectWindow("y"+yaxis+"fru.tif");
+close();
+selectWindow("y"+yaxis+"frug.tif");
+
+//calibracion de la placa segun lote
+
+configuracio = "open=[C:\\Documents and Settings\\Administrador\\Escritorio\\IMRT\\EBT2_Cal\\cal90m"+lote+"dir.txt] function=[4th Degree Polynomial] unit=[Gy] text1=["+grisos+"] text2=["+dosis+"]";
+run("Calibrate...", configuracio);
+saveAs("Text Image", "Z:\\"+nh+"_FILM\\y"+yaxis+"frug.tif");
+
+print("fin del procesado de la placa 1");
+
+//Reordenacion de placas en bruto
+
+File.makeDirectory("Z:\\"+nh+"_FILM\\Raw")
+File.makeDirectory("Z:\\"+nh+"_FILM\\Rest")
+temp = File.rename("Z:\\"+nh+"_FILM\\y"+yaxis+"a.tif", "Z:\\"+nh+"_FILM\\Rest\\y"+yaxis+"a.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\y"+yaxis+"b.tif", "Z:\\"+nh+"_FILM\\Rest\\y"+yaxis+"b.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\y"+yaxis+"c.tif", "Z:\\"+nh+"_FILM\\Rest\\y"+yaxis+"c.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\y"+yaxis+"d.tif", "Z:\\"+nh+"_FILM\\Rest\\y"+yaxis+"d.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\y"+yaxis+"r.tif", "Z:\\"+nh+"_FILM\\Raw\\y"+yaxis+"r.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\y"+yaxis+"fr.tif", "Z:\\"+nh+"_FILM\\Rest\\y"+yaxis+"fr.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\y"+yaxis+"fru.tif", "Z:\\"+nh+"_FILM\\Rest\\y"+yaxis+"fru.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\y"+yaxis+"frug.tif", "Z:\\"+nh+"_FILM\\Rest\\y"+yaxis+"frug.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\f"+placa+"r.tif", "Z:\\"+nh+"_FILM\\Raw\\f"+placa+"r.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\f"+placa+"a.tif", "Z:\\"+nh+"_FILM\\Rest\\f"+placa+"a.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\f"+placa+"b.tif", "Z:\\"+nh+"_FILM\\Rest\\f"+placa+"b.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\f"+placa+"c.tif", "Z:\\"+nh+"_FILM\\Rest\\f"+placa+"c.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\f"+placa+"d.tif", "Z:\\"+nh+"_FILM\\Rest\\f"+placa+"d.tif");
+
+}
+
+'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>placa dos'
+
+//Para la mejor comprensión del programa ver la placa uno en donde existen comentarios sobre el flujo de trabajo del programa
+
+
+ anemi = Dialog.getCheckbox();
+  if (anemi==true){
+  
+  placa = Dialog.getString();
+  yaxis = Dialog.getString();
+  
+
+open("Z:\\"+nh+"_FILM\\y"+yaxis+"A.tif");
+open("Z:\\"+nh+"_FILM\\y"+yaxis+"B.tif");
+open("Z:\\"+nh+"_FILM\\y"+yaxis+"C.tif");
+open("Z:\\"+nh+"_FILM\\y"+yaxis+"D.tif");
+imageCalculator("Average create stack", "y"+yaxis+"A.tif","y"+yaxis+"B.tif");
+imageCalculator("Average create stack", "y"+yaxis+"C.tif","y"+yaxis+"D.tif");
+imageCalculator("Average create stack", "Result of y"+yaxis+"A.tif","Result of y"+yaxis+"C.tif");
+selectWindow("Result of y"+yaxis+"C.tif");
+close();
+selectWindow("Result of y"+yaxis+"A.tif");
+close();
+selectWindow("y"+yaxis+"D.tif");
+close();
+selectWindow("y"+yaxis+"C.tif");
+close();
+selectWindow("y"+yaxis+"B.tif");
+close();
+selectWindow("y"+yaxis+"A.tif");
+close();
+selectWindow("Result of Result of y"+yaxis+"A.tif");
+run("Split Channels");
+selectWindow("C2-Result of Result of y"+yaxis+"A.tif");
+close();
+selectWindow("C3-Result of Result of y"+yaxis+"A.tif");
+close();
+saveAs("Tiff", "Z:\\"+nh+"_FILM\\y"+yaxis+"r.tif");
+
+open("Z:\\"+nh+"_FILM\\F"+placa+"A.tif");
+open("Z:\\"+nh+"_FILM\\F"+placa+"B.tif");
+open("Z:\\"+nh+"_FILM\\F"+placa+"C.tif");
+open("Z:\\"+nh+"_FILM\\F"+placa+"D.tif");
+imageCalculator("Average create stack", "F"+placa+"A.tif","F"+placa+"B.tif");
+imageCalculator("Average create stack", "F"+placa+"C.tif","F"+placa+"D.tif");
+imageCalculator("Average create stack", "Result of F"+placa+"A.tif","Result of F"+placa+"C.tif");
+selectWindow("Result of F"+placa+"C.tif");
+close();
+selectWindow("Result of F"+placa+"A.tif");
+close();
+selectWindow("F"+placa+"D.tif");
+close();
+selectWindow("F"+placa+"C.tif");
+close();
+selectWindow("F"+placa+"B.tif");
+close();
+selectWindow("F"+placa+"A.tif");
+close();
+selectWindow("Result of Result of F"+placa+"A.tif");
+run("Split Channels");
+selectWindow("C2-Result of Result of F"+placa+"A.tif");
+close();
+selectWindow("C3-Result of Result of F"+placa+"A.tif");
+close();
+saveAs("Tiff", "Z:\\"+nh+"_FILM\\f"+placa+"r.tif");
+imageCalculator("Subtract create", "f"+placa+"r.tif","y"+yaxis+"r.tif");
+selectWindow("Result of f"+placa+"r.tif");
+selectWindow("y"+yaxis+"r.tif");
+close();
+selectWindow("f"+placa+"r.tif");
+close();
+saveAs("Tiff", "Z:\\"+nh+"_FILM\\y"+yaxis+"fr.tif");
+
+run("Conversions...", " ");
+open("Z:\\Calibraciones\\Correccion Uniformidad\\Norma16.tif");
+imageCalculator("Divide create 32-bit", "y"+yaxis+"fr.tif","Norma16.tif");
+selectWindow("Result of y"+yaxis+"fr.tif");
+run("16-bit");
+saveAs("Tiff", "Z:\\"+nh+"_FILM\\y"+yaxis+"fru.tif");
+selectWindow("y"+yaxis+"fr.tif");
+close();
+selectWindow(arxiunif);
+close();
+selectWindow("y"+yaxis+"fru.tif");
+
+
+p1i = p1idef1;
+p1j = p1jdef1;
+p2i = p2idef1;
+p2j = p2jdef1;
+p3i = p3idef1;
+p3j = p3jdef1;
+costat = costatdef1;
+
+min = mindef;
+for (i=p1i; i<p1i+costat; i++) {
+   for (j=p1j; j<p1j+costat; j++) {
+	mint = getPixel(i,j);
+	if (mint < min) {
+	min = mint;
+	p1x = i;
+	p1y = j;
+	} 
+   }
+}
+
+min = mindef;
+for (i=p2i; i<p2i+costat; i++) {
+   for (j=p2j; j<p2j+costat; j++) {
+	mint = getPixel(i,j);
+	if (mint < min) {
+	min = mint;
+	p2x = i;
+	p2y = j;
+	} 
+   }
+}
+
+min = mindef;
+for (i=p3i; i<p3i+costat; i++) {
+   for (j=p3j; j<p3j+costat; j++) {
+	mint = getPixel(i,j);
+	if (mint < min) {
+	min = mint;
+	p3x = i;
+	p3y = j;
+	} 
+   }
+}
+
+
+tanval = (p3x-p1x)/(p3y-p1y);
+alfa = atan(tanval)*360/2/3.1415926535-90.0;
+print("rotando placa...");
+print(alfa, " grados");
+
+run("Rotate... ", "angle=alfa grid=1 interpolation=Bilinear");
+
+p1i = p1idef2;
+p1j = p1jdef2;
+p2i = p2idef2;
+p2j = p2jdef2;
+p3i = p3idef2;
+p3j = p3jdef2;
+costat = costatdef2;
+
+min = mindef;
+for (i=p1i; i<p1i+costat; i++) {
+   for (j=p1j; j<p1j+costat; j++) {
+	mint = getPixel(i,j);
+	if (mint < min) {
+	min = mint;
+	p1x = i;
+	p1y = j;
+	} 
+   }
+}
+
+min = mindef;
+for (i=p2i; i<p2i+costat; i++) {
+   for (j=p2j; j<p2j+costat; j++) {
+	mint = getPixel(i,j);
+	if (mint < min) {
+	min = mint;
+	p2x = i;
+	p2y = j;
+	} 
+   }
+}
+
+min = mindef;
+for (i=p3i; i<p3i+costat; i++) {
+   for (j=p3j; j<p3j+costat; j++) {
+	mint = getPixel(i,j);
+	if (mint < min) {
+	min = mint;
+	p3x = i;
+	p3y = j;
+	} 
+   }
+}
+
+
+
+p0x = origenx + p2x;
+p0y = origeny+p1y;
+
+print("origen de la placa ", p0x,p0y);
+
+makeRectangle(p0x-margex, p0y-margey, 2*margex, 2*margey);
+run("Copy");
+run("Internal Clipboard");
+saveAs("Tiff", "temp.tif");
+configuracio = "x=- y=- width="+amplada+" height="+alsada+" interpolation=Bicubic create title=temp.tif";
+run("Scale...", configuracio);
+run("Remove Outliers...", "radius=2 threshold=50 which=Bright");
+saveAs("Tiff", "Z:\\"+nh+"_FILM\\y"+yaxis+"frug.tif");
+selectWindow("temp.tif");
+close();
+selectWindow("y"+yaxis+"fru.tif");
+close();
+selectWindow("y"+yaxis+"frug.tif");
+
+configuracio = "open=[C:\\Documents and Settings\\Administrador\\Escritorio\\IMRT\\EBT2_Cal\\cal90m"+lote+"dir.txt] function=[4th Degree Polynomial] unit=[Gy] text1=["+grisos+"] text2=["+dosis+"]";
+run("Calibrate...", configuracio);
+saveAs("Text Image", "Z:\\"+nh+"_FILM\\y"+yaxis+"frug.tif");
+
+print("fin del procesado de la placa 2");
+
+//Reordenacion de placas en bruto
+
+File.makeDirectory("Z:\\"+nh+"_FILM\\Raw")
+File.makeDirectory("Z:\\"+nh+"_FILM\\Rest")
+temp = File.rename("Z:\\"+nh+"_FILM\\y"+yaxis+"a.tif", "Z:\\"+nh+"_FILM\\Rest\\y"+yaxis+"a.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\y"+yaxis+"b.tif", "Z:\\"+nh+"_FILM\\Rest\\y"+yaxis+"b.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\y"+yaxis+"c.tif", "Z:\\"+nh+"_FILM\\Rest\\y"+yaxis+"c.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\y"+yaxis+"d.tif", "Z:\\"+nh+"_FILM\\Rest\\y"+yaxis+"d.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\y"+yaxis+"r.tif", "Z:\\"+nh+"_FILM\\Raw\\y"+yaxis+"r.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\y"+yaxis+"fr.tif", "Z:\\"+nh+"_FILM\\Rest\\y"+yaxis+"fr.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\y"+yaxis+"fru.tif", "Z:\\"+nh+"_FILM\\Rest\\y"+yaxis+"fru.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\y"+yaxis+"frug.tif", "Z:\\"+nh+"_FILM\\Rest\\y"+yaxis+"frug.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\f"+placa+"r.tif", "Z:\\"+nh+"_FILM\\Raw\\f"+placa+"r.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\f"+placa+"a.tif", "Z:\\"+nh+"_FILM\\Rest\\f"+placa+"a.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\f"+placa+"b.tif", "Z:\\"+nh+"_FILM\\Rest\\f"+placa+"b.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\f"+placa+"c.tif", "Z:\\"+nh+"_FILM\\Rest\\f"+placa+"c.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\f"+placa+"d.tif", "Z:\\"+nh+"_FILM\\Rest\\f"+placa+"d.tif");
+
+}
+
+
+'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>placa tres'
+
+
+ anemi = Dialog.getCheckbox();
+  if (anemi==true){
+  
+  placa = Dialog.getString();
+  yaxis = Dialog.getString();
+  
+
+open("Z:\\"+nh+"_FILM\\y"+yaxis+"A.tif");
+open("Z:\\"+nh+"_FILM\\y"+yaxis+"B.tif");
+open("Z:\\"+nh+"_FILM\\y"+yaxis+"C.tif");
+open("Z:\\"+nh+"_FILM\\y"+yaxis+"D.tif");
+imageCalculator("Average create stack", "y"+yaxis+"A.tif","y"+yaxis+"B.tif");
+imageCalculator("Average create stack", "y"+yaxis+"C.tif","y"+yaxis+"D.tif");
+imageCalculator("Average create stack", "Result of y"+yaxis+"A.tif","Result of y"+yaxis+"C.tif");
+selectWindow("Result of y"+yaxis+"C.tif");
+close();
+selectWindow("Result of y"+yaxis+"A.tif");
+close();
+selectWindow("y"+yaxis+"D.tif");
+close();
+selectWindow("y"+yaxis+"C.tif");
+close();
+selectWindow("y"+yaxis+"B.tif");
+close();
+selectWindow("y"+yaxis+"A.tif");
+close();
+selectWindow("Result of Result of y"+yaxis+"A.tif");
+run("Split Channels");
+selectWindow("C2-Result of Result of y"+yaxis+"A.tif");
+close();
+selectWindow("C3-Result of Result of y"+yaxis+"A.tif");
+close();
+saveAs("Tiff", "Z:\\"+nh+"_FILM\\y"+yaxis+"r.tif");
+
+open("Z:\\"+nh+"_FILM\\F"+placa+"A.tif");
+open("Z:\\"+nh+"_FILM\\F"+placa+"B.tif");
+open("Z:\\"+nh+"_FILM\\F"+placa+"C.tif");
+open("Z:\\"+nh+"_FILM\\F"+placa+"D.tif");
+imageCalculator("Average create stack", "F"+placa+"A.tif","F"+placa+"B.tif");
+imageCalculator("Average create stack", "F"+placa+"C.tif","F"+placa+"D.tif");
+imageCalculator("Average create stack", "Result of F"+placa+"A.tif","Result of F"+placa+"C.tif");
+selectWindow("Result of F"+placa+"C.tif");
+close();
+selectWindow("Result of F"+placa+"A.tif");
+close();
+selectWindow("F"+placa+"D.tif");
+close();
+selectWindow("F"+placa+"C.tif");
+close();
+selectWindow("F"+placa+"B.tif");
+close();
+selectWindow("F"+placa+"A.tif");
+close();
+selectWindow("Result of Result of F"+placa+"A.tif");
+run("Split Channels");
+selectWindow("C2-Result of Result of F"+placa+"A.tif");
+close();
+selectWindow("C3-Result of Result of F"+placa+"A.tif");
+close();
+saveAs("Tiff", "Z:\\"+nh+"_FILM\\f"+placa+"r.tif");
+imageCalculator("Subtract create", "f"+placa+"r.tif","y"+yaxis+"r.tif");
+selectWindow("Result of f"+placa+"r.tif");
+selectWindow("y"+yaxis+"r.tif");
+close();
+selectWindow("f"+placa+"r.tif");
+close();
+saveAs("Tiff", "Z:\\"+nh+"_FILM\\y"+yaxis+"fr.tif");
+
+run("Conversions...", " ");
+open("Z:\\Calibraciones\\Correccion Uniformidad\\Norma16.tif");
+imageCalculator("Divide create 32-bit", "y"+yaxis+"fr.tif","Norma16.tif");
+selectWindow("Result of y"+yaxis+"fr.tif");
+run("16-bit");
+saveAs("Tiff", "Z:\\"+nh+"_FILM\\y"+yaxis+"fru.tif");
+selectWindow("y"+yaxis+"fr.tif");
+close();
+selectWindow(arxiunif);
+close();
+selectWindow("y"+yaxis+"fru.tif");
+
+
+p1i = p1idef1;
+p1j = p1jdef1;
+p2i = p2idef1;
+p2j = p2jdef1;
+p3i = p3idef1;
+p3j = p3jdef1;
+costat = costatdef1;
+
+min = mindef;
+for (i=p1i; i<p1i+costat; i++) {
+   for (j=p1j; j<p1j+costat; j++) {
+	mint = getPixel(i,j);
+	if (mint < min) {
+	min = mint;
+	p1x = i;
+	p1y = j;
+	} 
+   }
+}
+
+min = mindef;
+for (i=p2i; i<p2i+costat; i++) {
+   for (j=p2j; j<p2j+costat; j++) {
+	mint = getPixel(i,j);
+	if (mint < min) {
+	min = mint;
+	p2x = i;
+	p2y = j;
+	} 
+   }
+}
+
+min = mindef;
+for (i=p3i; i<p3i+costat; i++) {
+   for (j=p3j; j<p3j+costat; j++) {
+	mint = getPixel(i,j);
+	if (mint < min) {
+	min = mint;
+	p3x = i;
+	p3y = j;
+	} 
+   }
+}
+
+
+tanval = (p3x-p1x)/(p3y-p1y);
+alfa = atan(tanval)*360/2/3.1415926535-90.0;
+print("rotando placa...");
+print(alfa, " grados");
+
+run("Rotate... ", "angle=alfa grid=1 interpolation=Bilinear");
+
+p1i = p1idef2;
+p1j = p1jdef2;
+p2i = p2idef2;
+p2j = p2jdef2;
+p3i = p3idef2;
+p3j = p3jdef2;
+costat = costatdef2;
+
+min = mindef;
+for (i=p1i; i<p1i+costat; i++) {
+   for (j=p1j; j<p1j+costat; j++) {
+	mint = getPixel(i,j);
+	if (mint < min) {
+	min = mint;
+	p1x = i;
+	p1y = j;
+	} 
+   }
+}
+
+min = mindef;
+for (i=p2i; i<p2i+costat; i++) {
+   for (j=p2j; j<p2j+costat; j++) {
+	mint = getPixel(i,j);
+	if (mint < min) {
+	min = mint;
+	p2x = i;
+	p2y = j;
+	} 
+   }
+}
+
+min = mindef;
+for (i=p3i; i<p3i+costat; i++) {
+   for (j=p3j; j<p3j+costat; j++) {
+	mint = getPixel(i,j);
+	if (mint < min) {
+	min = mint;
+	p3x = i;
+	p3y = j;
+	} 
+   }
+}
+
+
+
+p0x = origenx + p2x;
+p0y = origeny+p1y;
+
+print("origen de la placa ", p0x,p0y);
+
+makeRectangle(p0x-margex, p0y-margey, 2*margex, 2*margey);
+run("Copy");
+run("Internal Clipboard");
+saveAs("Tiff", "temp.tif");
+configuracio = "x=- y=- width="+amplada+" height="+alsada+" interpolation=Bicubic create title=temp.tif";
+run("Scale...", configuracio);
+run("Remove Outliers...", "radius=2 threshold=50 which=Bright");
+saveAs("Tiff", "Z:\\"+nh+"_FILM\\y"+yaxis+"frug.tif");
+selectWindow("temp.tif");
+close();
+selectWindow("y"+yaxis+"fru.tif");
+close();
+selectWindow("y"+yaxis+"frug.tif");
+
+configuracio = "open=[C:\\Documents and Settings\\Administrador\\Escritorio\\IMRT\\EBT2_Cal\\cal90m"+lote+"dir.txt] function=[4th Degree Polynomial] unit=[Gy] text1=["+grisos+"] text2=["+dosis+"]";
+run("Calibrate...", configuracio);
+saveAs("Text Image", "Z:\\"+nh+"_FILM\\y"+yaxis+"frug.tif");
+
+print("fin del procesado de la placa 3");
+
+//Reordenacion de placas en bruto
+
+File.makeDirectory("Z:\\"+nh+"_FILM\\Raw")
+File.makeDirectory("Z:\\"+nh+"_FILM\\Rest")
+temp = File.rename("Z:\\"+nh+"_FILM\\y"+yaxis+"a.tif", "Z:\\"+nh+"_FILM\\Rest\\y"+yaxis+"a.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\y"+yaxis+"b.tif", "Z:\\"+nh+"_FILM\\Rest\\y"+yaxis+"b.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\y"+yaxis+"c.tif", "Z:\\"+nh+"_FILM\\Rest\\y"+yaxis+"c.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\y"+yaxis+"d.tif", "Z:\\"+nh+"_FILM\\Rest\\y"+yaxis+"d.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\y"+yaxis+"r.tif", "Z:\\"+nh+"_FILM\\Raw\\y"+yaxis+"r.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\y"+yaxis+"fr.tif", "Z:\\"+nh+"_FILM\\Rest\\y"+yaxis+"fr.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\y"+yaxis+"fru.tif", "Z:\\"+nh+"_FILM\\Rest\\y"+yaxis+"fru.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\y"+yaxis+"frug.tif", "Z:\\"+nh+"_FILM\\Rest\\y"+yaxis+"frug.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\f"+placa+"r.tif", "Z:\\"+nh+"_FILM\\Raw\\f"+placa+"r.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\f"+placa+"a.tif", "Z:\\"+nh+"_FILM\\Rest\\f"+placa+"a.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\f"+placa+"b.tif", "Z:\\"+nh+"_FILM\\Rest\\f"+placa+"b.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\f"+placa+"c.tif", "Z:\\"+nh+"_FILM\\Rest\\f"+placa+"c.tif");
+temp = File.rename("Z:\\"+nh+"_FILM\\f"+placa+"d.tif", "Z:\\"+nh+"_FILM\\Rest\\f"+placa+"d.tif");
+
+}
+
+
+
+

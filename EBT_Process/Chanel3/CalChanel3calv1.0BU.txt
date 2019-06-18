@@ -1,0 +1,447 @@
+
+  requires("1.47v");
+
+//=======INICIALIZACION DE VARIABLES==CHECKSUM=====================================
+//inicializacion de variables
+  title = "Calibración de dosis MULTICANAL - 8-FOLD WAY";
+  data="ddmmaa"; 
+  lot="AH";
+  temps = "90m";
+  rutacal = "C:\\Documents and Settings\\Administrador\\Escritorio\\IMRT\\EBT2_Cal\\Mch\\";
+  rutapac = "Z:\\Calibraciones\\Cal"		
+
+//valores del fondo por sectores para evaluar su constancia
+//1 plástico, 2 placa, 3 fondo desnudo del escaner
+
+  vmitjana1 = 65502;
+  vmitjana2 = 46000;
+  vmitjana3 = 61555.2;
+  vdesv1 = 100;
+  vdesv2 = 3000;
+  vdesv3 = 380;
+
+//====MAGIC FACTORS======
+//porcentajes de correccion por unformidad por fold
+//bajar el peso sube la curva de dosis respecto al pv
+//Los valores de correccion de pesos se establecen empiricamente
+//por comparacion con pdd en axial. CalAxialfrom8Fold.xls en IMRT
+//global
+w0 = 1.05;
+
+//0.1498
+w1 = 65*w0;
+//0.2995
+w2 = 73*w0;
+//0.5993
+w3 = 80*w0;
+//0.8989
+w4 = 88*w0;
+//1.1986
+w5 = 90*w0;
+//1.648
+w6 = 91*w0;
+//2.0975
+w7 = 91*w0;  
+//2.5469
+w8 = 92*w0;
+
+//==================== cuadrado de media de la medida ======================
+
+  supx = 815;
+  supy = 635;
+  saltx = 288;
+  salty = 174;
+
+
+  costat = 50;
+  centrex = 10;
+  centrey = 10; 
+
+//parametros de ajuste de la regresión
+
+Cresol = 0.01;
+
+//Parametro de ajuste uniformidad
+//Media de porcentaje de desviacion respecto al centro para 2 Gy
+
+uniper = 0;
+
+//Opcion de debug clasico, si log = 1 escribe en log window los valores de pixel de los campos
+
+logval = 1;
+
+wei = newArray("1","1","1");
+ 
+//========================FIN DE INICIALIZACION VARIABLES, FIN CHECKSUM===========
+
+//=============INTERFACE===USER data INPUT====================================
+//inicio de la interface de recogida de datos NH, Calibracion, cortes y placas
+  Dialog.create(title);
+  Dialog.addMessage("CALIBRACION DE EBT2 MULTICANAL                                       ");
+  Dialog.addString("Fecha:", data);  
+  Dialog.addString("Lote:", lot);
+  Dialog.addCheckbox("Interrumpir ante errores de fondo", true);
+  Dialog.addCheckbox("clasificacion alfabetica", true);
+  Dialog.addCheckbox("placa invertida", false);
+  Dialog.addMessage("Equalizador:");
+  Dialog.addSlider("Red", 0, 1, 0.5);
+  Dialog.addSlider("Green", 0, 1, 0.5);
+  Dialog.addSlider("Blue", 0, 1, 0.5); 
+
+  Dialog.show();
+  data = Dialog.getString();
+  lot = Dialog.getString();
+  stoper = Dialog.getCheckbox();
+  alfabet = Dialog.getCheckbox();
+  invertin = Dialog.getCheckbox();
+  pes1 = Dialog.getNumber();
+  pes2 = Dialog.getNumber();
+  pes3 = Dialog.getNumber();
+  wei[0] = pes1;
+  wei[1] = pes2;
+  wei[2] = pes3;
+
+//FLUJO DEL PROGRAMA PRINCIPAL
+
+//Se crea el directorio de resultados intermedios (borrable)
+
+	File.makeDirectory(rutapac+data+lot+temps+"\\Rest");
+
+//Opcion de definicion de los archivos, numerico alfabet = false, A, B, C, D alfabet = true;
+
+if (alfabet==true) {
+	vA = "A";
+	vB = "B";
+	vC = "C";
+	vD = "D";
+} else {
+	vA = "001";
+	vB = "002";
+	vC = "003";
+	vD = "004";
+}
+
+//<<<<
+//===========abrir fondos y placas irradiadas, realizar la media de cuatro placas
+//===========extraer los tres canales de las medias
+//===========correccion por uniformidad en funcion del espacio y la dosis (NO SE APLICA)
+//===========substraccion del fondo a las placas irradiadas
+//<<<<
+
+///========PROCESADO INICIAL: MEDIA, SEPARACION POR COLORES, SUBSTRACCION DEL FONDO=========
+///========CORRECCION POR UNIFORMIDAD SEGUN LA FORMULA DE DURRHEIM (NO SE APLICA)
+ 
+//anemi, variable de stop segun stoper
+
+  
+//media de las placas irradiadas
+
+	open(rutapac+data+lot+temps+"\\C"+lot+vA+".tif");
+	open(rutapac+data+lot+temps+"\\C"+lot+vB+".tif");
+	open(rutapac+data+lot+temps+"\\C"+lot+vC+".tif");
+	open(rutapac+data+lot+temps+"\\C"+lot+vD+".tif");
+	imageCalculator("Average create stack", "C"+lot+vA+".tif","C"+lot+vB+".tif");
+	imageCalculator("Average create stack", "C"+lot+vC+".tif","C"+lot+vD+".tif");
+	imageCalculator("Average create stack", "Result of C"+lot+vA+".tif","Result of C"+lot+vC+".tif");
+
+	selectWindow("Result of C"+lot+vC+".tif");
+	close();
+	selectWindow("Result of C"+lot+vA+".tif");
+	close();
+	selectWindow("C"+lot+vD+".tif");
+	close();
+	selectWindow("C"+lot+vC+".tif");
+	close();
+	selectWindow("C"+lot+vB+".tif");
+	close();
+	selectWindow("C"+lot+vA+".tif");
+	close();
+	selectWindow("Result of Result of C"+lot+vA+".tif");
+
+
+//multi-canal r g b placas irradiadas
+
+	run("Split Channels");
+	selectWindow("C1-Result of Result of C"+lot+vA+".tif");
+	saveAs("Tiff", rutapac+data+lot+temps+"\\Rest\\c"+lot+"r.tif");
+	selectWindow("C2-Result of Result of C"+lot+vA+".tif");
+	saveAs("Tiff", rutapac+data+lot+temps+"\\Rest\\c"+lot+"g.tif");
+	selectWindow("C3-Result of Result of C"+lot+vA+".tif");
+	saveAs("Tiff", rutapac+data+lot+temps+"\\Rest\\c"+lot+"b.tif");
+
+//media de los fondos
+
+	open(rutapac+data+lot+temps+"\\F"+lot+vA+".tif");
+	open(rutapac+data+lot+temps+"\\F"+lot+vB+".tif");
+	open(rutapac+data+lot+temps+"\\F"+lot+vC+".tif");
+	open(rutapac+data+lot+temps+"\\F"+lot+vD+".tif");
+	imageCalculator("Average create stack", "F"+lot+vA+".tif","F"+lot+vB+".tif");
+	imageCalculator("Average create stack", "F"+lot+vC+".tif","F"+lot+vD+".tif");
+	imageCalculator("Average create stack", "Result of F"+lot+vA+".tif","Result of F"+lot+vC+".tif");
+
+	selectWindow("Result of F"+lot+vC+".tif");
+	close();
+	selectWindow("Result of F"+lot+vA+".tif");
+	close();
+	selectWindow("F"+lot+vD+".tif");
+	close();
+	selectWindow("F"+lot+vC+".tif");
+	close();
+	selectWindow("F"+lot+vB+".tif");
+	close();
+	selectWindow("F"+lot+vA+".tif");
+	close();
+	selectWindow("Result of Result of F"+lot+vA+".tif");
+
+	
+//multi-canal r g b del fondo
+
+	run("Split Channels");
+	
+	selectWindow("C1-Result of Result of F"+lot+vA+".tif");
+	saveAs("Tiff", rutapac+data+lot+temps+"\\Rest\\f"+lot+"r.tif");
+	selectWindow("C2-Result of Result of F"+lot+vA+".tif");
+	saveAs("Tiff", rutapac+data+lot+temps+"\\Rest\\f"+lot+"g.tif");
+	selectWindow("C3-Result of Result of F"+lot+vA+".tif");
+	saveAs("Tiff", rutapac+data+lot+temps+"\\Rest\\f"+lot+"b.tif");
+	selectWindow("f"+lot+"r.tif");
+
+// <<<Verificacion constancia escaneo canal rojo
+	//PARENTESIS DE VERIFICACION DE CONSTANCIA
+		makeRectangle(49, 366, 155, 152);
+		getStatistics(n, mean, min, max, std, histogram);
+		if ((mean < vmitjana1+vdesv1) && (mean > vmitjana1-vdesv1)) { 
+			print("sector 1 escaner constante OK");}
+		else { if(stoper == true){
+			Dialog.create("Error sector1");
+			Dialog.addMessage("Error en el fondo de cristal");
+			Dialog.show();}}
+		makeRectangle(529, 418, 161, 156);
+		getStatistics(n, mean, min, max, std, histogram);
+		if ((mean < vmitjana2+vdesv2) && (mean > vmitjana2-vdesv2)) { 
+			print("sector 2 escaner constante OK");}
+		else { if(stoper == true){ 
+			Dialog.create("Error sector2");
+			Dialog.addMessage("Error en el fondo de placa");
+			Dialog.show();}}
+		makeRectangle(972, 442, 120, 120);
+		getStatistics(n, mean, min, max, std, histogram);
+		if ((mean < vmitjana3+vdesv3) && (mean > vmitjana3-vdesv3)) { 
+			print("sector 3 escaner constante OK");}
+		else { if(stoper == true){
+			Dialog.create("Error sector3");
+			Dialog.addMessage("Error en el fondo de plastico");
+			Dialog.show();}}
+	run("Select None");
+	//FIN DE PARENTESIS
+
+//====resta y division de la placa irradiada por canales
+//rojo
+	
+	imageCalculator("Substract create", "f"+lot+"r.tif","c"+lot+"r.tif");
+	imageCalculator("Divide create 32-bit", "Result of f"+lot+"r.tif","f"+lot+"r.tif");
+	selectWindow("c"+lot+"r.tif");
+	close();
+	selectWindow("f"+lot+"r.tif");
+	close();
+	selectWindow("Result of Result of f"+lot+"r.tif");	
+	saveAs("Tiff", rutapac+data+lot+temps+"\\Rest\\c"+lot+"fr.tif");
+	selectWindow("Result of f"+lot+"r.tif");	
+	close();	
+
+//verde
+	
+	imageCalculator("Substract create", "f"+lot+"g.tif","c"+lot+"g.tif");
+	imageCalculator("Divide create 32-bit", "Result of f"+lot+"g.tif","f"+lot+"g.tif");
+	selectWindow("c"+lot+"g.tif");
+	close();
+	selectWindow("f"+lot+"g.tif");
+	close();
+	selectWindow("Result of Result of f"+lot+"g.tif");	
+	saveAs("Tiff", rutapac+data+lot+temps+"\\Rest\\c"+lot+"fg.tif");
+	selectWindow("Result of f"+lot+"g.tif");	
+	close();	
+
+//azul
+	
+	imageCalculator("Substract create", "f"+lot+"b.tif","c"+lot+"b.tif");
+	imageCalculator("Divide create 32-bit", "Result of f"+lot+"b.tif","f"+lot+"b.tif");
+	selectWindow("c"+lot+"b.tif");
+	close();
+	selectWindow("f"+lot+"b.tif");
+	close();
+	selectWindow("Result of Result of f"+lot+"b.tif");	
+	saveAs("Tiff", rutapac+data+lot+temps+"\\Rest\\c"+lot+"fb.tif");
+	selectWindow("Result of f"+lot+"b.tif");	
+	close();	
+
+		
+//========FIN PROCESADO INICIAL PLACAS
+
+/////============================OBTENCION DE VALORES POR SECTORES Y COLORES==============
+
+quark = newArray("r","g","b");
+ng = newArray(8);
+ang = newArray(8);
+
+//Valores de referencia de las dosis para los ocho campos de 5x5 cm a DFS 100 y 10 cm de prof. Ver NH 00200.
+
+dosis = newArray( 0.1498, 0.2996, 0.5993, 0.8989, 1.1986, 1.648, 2.0975, 2.5469);
+
+sortida = File.open(rutacal+"cal3ch"+lot+".txt");
+stream = newArray(8);
+
+for (k=0; k<3; k++){
+
+	selectWindow("c"+lot+"f"+quark[k]+".tif");
+
+	if(invertin==false){
+		makeRectangle(supx-centrex, supy-centrey,costat, costat);
+		getStatistics(area, ng[0], min, max, std);
+		ng[0] = ng[0]*w1/100;
+		makeRectangle(supx-centrex, supy-salty-centrey, costat, costat);
+		getStatistics(area, ng[1], min, max, std);
+		ng[1] = ng[1]*w2/100;
+		makeRectangle(supx-centrex, supy-2*salty-centrey, costat, costat);
+		getStatistics(area, ng[2], min, max, std);
+		ng[2] = ng[2]*w3/100;
+		makeRectangle(supx-centrex, supy-3*salty-centrey, costat, costat);
+		getStatistics(area, ng[3], min, max, std);
+		ng[3] = ng[3]*w4/100;
+		makeRectangle(supx-saltx-centrex, supy-3*salty-centrey, costat, costat);
+		getStatistics(area, ng[4], min, max, std);
+		ng[4] = ng[4]*w5/100;
+		makeRectangle(supx-saltx-centrex, supy-2*salty-centrey, costat, costat);
+		getStatistics(area, ng[5], min, max, std);
+		ng[5] = ng[5]*w6/100;
+		makeRectangle(supx-saltx-centrex, supy-salty-centrey, costat, costat);
+		getStatistics(area, ng[6], min, max, std);
+		ng[6] = ng[6]*w7/100;
+		makeRectangle(supx-saltx-centrex, supy-centrey, costat, costat);
+		getStatistics(area, ng[7], min, max, std);
+		ng[7] = ng[7]*w8/100;
+		
+		if(logval ==1){
+			print("nivel de gris "+quark[k]+" :");
+			for(kin=0; kin<8;kin++){
+				print (ng[kin]);
+			}
+		}
+
+	}else{
+		makeRectangle(supx-centrex, supy-3*salty-centrey,costat, costat);
+		getStatistics(area, ng[0], min, max, std);
+		ng[0] = ng[0]*w1/100;
+		makeRectangle(supx-centrex, supy-2*salty-centrey, costat, costat);
+		getStatistics(area, ng[1], min, max, std);
+		ng[1] = ng[1]*w2/100;
+		makeRectangle(supx-centrex, supy-salty-centrey, costat, costat);
+		getStatistics(area, ng[2], min, max, std);
+		ng[2] = ng[2]*w2/100;
+		makeRectangle(supx-centrex, supy-centrey, costat, costat);
+		getStatistics(area, ng[3], min, max, std);
+		ng[3] = ng[3]*w4/100;
+		makeRectangle(supx-saltx-centrex, supy-centrey, costat, costat);
+		getStatistics(area, ng[4], min, max, std);
+		ng[4] = ng[4]*w5/100;
+		makeRectangle(supx-saltx-centrex, supy-salty-centrey, costat, costat);
+		getStatistics(area, ng[5], min, max, std);
+		ng[5] = ng[5]*w6/100;
+		makeRectangle(supx-saltx-centrex, supy-2*salty-centrey, costat, costat);
+		getStatistics(area, ng[6], min, max, std);
+		ng[6] = ng[6]*w7/100;
+		makeRectangle(supx-saltx-centrex, supy-3*salty-centrey, costat, costat);
+		getStatistics(area, ng[7], min, max, std);
+		ng[7] = ng[7]*w8/100;		
+		if(logval ==1){
+			print("nivel de gris "+quark[k]+" :");
+			for(kin=0; kin<8;kin++){
+				print (ng[kin]);
+			}
+		}
+	}	
+
+		mem = 0.0;	
+		for(j = 0; j < 7; j = j + Cresol){
+
+		for(i=0; i<8; i++){
+			ang[i] = ng[i]*(j+dosis[i])/10000;
+		}
+	
+		Fit.doFit("Straight Line", ang, dosis);
+		rsq = Fit.rSquared;
+		if(rsq >= mem){
+			Cpar = j;
+			mem2 = rsq;
+		}
+		mem = rsq;
+	}
+	//print(Cpar);
+	//print(d2s(mem2,6));
+
+	for(i=0; i<8; i++){
+		ang[i] = ng[i]*(Cpar+dosis[i])/10000;
+	}	
+	Fit.doFit("Straight Line", ang, dosis);
+	Npar= Fit.p(0);
+	Mpar = Fit.p(1);
+	mem3 = Fit.rSquared;
+	Bpar = 1/Mpar*10000;
+	Apar = -Npar/Mpar*10000;
+	sA = d2s(Apar, 3);
+	sB = d2s(Bpar, 3);
+	sC = d2s(Cpar, 2);
+	print(sortida, sA+"	"+sB+"	"+sC+"	"+wei[k]);
+	print(" R^2 para C = ", mem2, " para A y B = ", mem3);
+	
+}
+
+
+print("\n FIN DEL PROCESADO TOTAL");
+
+//================================================================================================
+//=================================================== FUNCIONES ==================================
+//================================================================================================
+
+	//se utiliza función dependiente de la dosis (nivel de gris) y de la posición
+	//el modelo teorico esta sacado de la intensidad de una fuente luminosa de longitud finita -tesis DurrheimCR-
+
+function cuniform(placa){
+
+	//Correccion por ajuste lineal cuadrático de las medidas empiricas. 
+
+	//Constante "Mágica"
+	Bpar = -1.59931;
+	Apar = 10.6904;
+	scat = 50;	
+		
+	//Margenes de correccion
+
+	conmarx = 300;
+	conmar2x = 1000;
+	conmary = 90;
+	conmar2y = 860;
+	conori = 440;
+
+	print("correccion por uniformidad de "+placa);
+	print ("Inicio de la corrección por uniformidad");
+	for(i=conmarx; i<=conmar2x; i++){
+		for(j=conmary; j<= conmar2y; j++){
+			varpx = (j-conori);
+			Xd = getPixel(i, j);
+		
+		//FUNCION DEL MODELO
+
+			renfactor = (Bpar*Xd/10000+Apar)*varpx*varpx/100000+100;
+			renfactor = renfactor/100;
+
+		//====
+			Xd = Xd / renfactor;
+			setPixel(i, j, Xd);
+			percent = (i-conmarx)/(conmar2x-conmarx)*100;
+			print("\\Update: C.U :", d2s(percent,2), " %", renfactor);
+			
+		}
+	}
+}
+
