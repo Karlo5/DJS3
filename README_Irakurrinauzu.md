@@ -7,11 +7,13 @@ COMPONENTES PRINCIPALES DE LA DONOSTIA JAVA SUITE 3
 Donosita Java Suite
 
 
-CR_Process: Herramientas para el procesado de imágenes CR. Realmente tambien se puede usar para imágenes EPID pero no explota los TAGs de las imagenes.
+CR_Process: 
+Herramientas para el procesado de imágenes CR. Realmente tambien se puede usar para imágenes EPID pero no explota los TAGs de las imagenes.
 -DigInsert_Pro: Captura puntos de una imagen y los transpone para su captura en un Excel. Creado para capturar los puntos de un inserto de electrones dibujado sobre placa o papel, escaneado previamente con una escala conocida.
 -LZ_RX: Macro diseñada para analizar una placa de coincidencia Luz_Rayos de un acelerador. Captura un punto central y 8 puntos del campo de luz y 8 puntos del campo de radiación (2 por lado). Después calcula la diferencia en mm. Se supone que no hay conversión de escala. Imagen en el Isocentro.
 
-DICOM_RTs: Conjunto de macros para explotar los DICOM_RTs. Contiene muchas macros en proceso o abandonadas. Sólo se explican las dos que mas se usan
+DICOM_RTs: 
+Conjunto de macros para explotar los DICOM_RTs. Contiene muchas macros en proceso o abandonadas. Sólo se explican las dos que mas se usan
 -OMP_Coronal_Dose_Convolucionator: Macro para extraer un corte de dosis de un archivo RT_Dose exportado desde un planificador Oncentra en formato DICOM. Extrae un corte a 10 cm de profundidad (dada unas dimensiones especificas de la matriz de calculo) y convoluciona el plano por un filtro simulando la respuesta de una cámara de ionización, en concreto las cámaras de una matriz 729-Octavius de PTW.
 -DICOM_TAG_Extract: Extrae el valor de un DICOM TAG de cualquier archivo DICOM.
 
